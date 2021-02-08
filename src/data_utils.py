@@ -159,7 +159,7 @@ def make_allennlp():
 
 def get_paragraphs(datum):
     paragraphs = []
-    text = datum['text'].numpy().decode('utf-8')
+    text = datum['text'].numpy().decode('utf-8').encode('ascii', 'ignore').decode('UTF-8')
     for para in text.split("_START_"):
         if not para.startswith("PARAGRAPH_"):
             continue
