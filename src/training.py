@@ -50,20 +50,22 @@ parser.add_argument('--dry-run', action='store_true',
 
 class ModelRunner():
     def __init__(self, cmd_line_args=[]):  # pylint: disable=dangerous-default-value
-        self.args = args = parser.parse_args(cmd_line_args)
+        self.args = parser.parse_args(cmd_line_args)
         # Set the random seed manually for reproducibility.
-        torch.manual_seed(args.seed)
+        torch.manual_seed(self.args.seed)
         if torch.cuda.is_available():
-            if not args.cuda:
+            if not self.args.cuda:
                 print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
-        self.device = torch.device("cuda" if args.cuda else "cpu")
+        self.device = torch.device("cuda" if self.args.cuda else "cpu")
 
         ###############################################################################
         # Build the model
         ###############################################################################
 
-        self.model = model.TransformerModel(args.emsize, args.nhead, args.nhid, args.nlayers, args.dropout).to(self.device)
+        self.model = model.TransformerModel(self.args.emsize, self.args.nhead, 
+                                            self.args.nhid, self.args.nlayers, 
+                                            self.args.dropout).to(self.device)
         self.criterion = nn.MSELoss() # nn.NLLLoss()
 
     def evaluate(self, data_source):
