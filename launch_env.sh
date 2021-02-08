@@ -1,1 +1,1 @@
-conda activate discoher
+conda activate iterdiscoher

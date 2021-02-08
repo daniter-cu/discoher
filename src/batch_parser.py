@@ -8,6 +8,8 @@ parser.add_argument('--start', type=int, default=0,
                     help='Start wikipedia split.')
 parser.add_argument('--end', type=int, default=10,
                     help='End wikipedia split.')
+parser.add_argument('--batch', type=int, default=16,
+                    help='Batch size for SRL parser.')
 args = parser.parse_args()
 
 def main(start, end, fname):

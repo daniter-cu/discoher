@@ -1,4 +1,4 @@
-name: discoher
+name: iterdiscoher
 channels:
   - huggingface
   - conda-forge
@@ -7,7 +7,6 @@ channels:
 dependencies:
   - _tflow_select=2.3.0
   - absl-py=0.10.0
-  - appnope=0.1.2
   - argon2-cffi=20.1.0
   - astor=0.8.1
   - astroid=2.3.3
@@ -63,7 +62,6 @@ dependencies:
   - libcxx=10.0.0
   - libedit=3.1.20191231
   - libffi=3.3
-  - libgfortran=3.0.1
   - libpng=1.6.37
   - libprotobuf=3.13.0.1
   - libsodium=1.0.18

@@ -1,6 +1,7 @@
 import logging
 import unicodedata
 import pickle
+import torch
 from collections import defaultdict
 import tensorflow_datasets as tfds
 from spacy.lang.en import English
@@ -154,7 +155,7 @@ def make_lm_encoder():
     return tokenizer, model
 
 def make_allennlp():
-    predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/structured-prediction-srl-bert.2020.12.15.tar.gz")
+    predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/structured-prediction-srl-bert.2020.12.15.tar.gz", cuda_device=torch.cuda.current_device() )
     return predictor
 
 def get_paragraphs(datum):
