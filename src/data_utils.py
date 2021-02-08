@@ -10,7 +10,7 @@ from allennlp.predictors.predictor import Predictor
 
 
 SPECIAL_CHARS = ['-', '.', '\'', ',', '’', '/', ':', '–', '(', '&']
-TAGS = ['V', 'ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4', 'ARGM']
+TAGS = ['V', 'ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4', 'ARG5', 'ARGM']
 
 
 def get_wiki_data(start_examples=0, num_examples=10):
