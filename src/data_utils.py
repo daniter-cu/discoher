@@ -131,8 +131,8 @@ def build_repr(parse, word2veclist):
             unique_tags.add(tag[2:])
             for vec_index in word2veclist[i]:
                 tag_2_vec[tag.split("-")[1]].append(vec_index)
-        for key in tag_2_vec.keys():
-            assert key in TAGS, key +  str(list(unique_tags))
+        # for key in tag_2_vec.keys():
+            # assert key in TAGS, key +  str(list(unique_tags))
         verb_repr = []
         for tag in TAGS:
             if tag not in tag_2_vec:
@@ -181,7 +181,7 @@ def srl_paragraphs(paragraphs):
     for ex_idx, example in enumerate(paragraphs):
         doc = nlp(example)
         for sent in doc.sents:
-            span = sent.text.strip()
+            span = sent.text.strip()[:512*5]  # hack to not get sentences that are too long.
             lm_tokenized_input = tokenizer(span, return_tensors='pt')
             srl_parse = predictor.predict(sentence=span)
             token_strs = tokenizer.convert_ids_to_tokens(lm_tokenized_input['input_ids'].numpy()[0])
@@ -210,7 +210,7 @@ def srl_paragraphs_batched(paragraphs, batch_size=4):
     for ex_idx, example in enumerate(paragraphs):
         doc = nlp(example)
         for sent in doc.sents:
-            span = sent.text.strip()
+            span = sent.text.strip()[:512*5]  # hack to not get sentences that are too long.
             all_sents.append(span)
             lm_tokenized_input = tokenizer(span, return_tensors='pt')
             token_strs = tokenizer.convert_ids_to_tokens(lm_tokenized_input['input_ids'].numpy()[0])
