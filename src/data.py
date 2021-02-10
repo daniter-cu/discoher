@@ -1,6 +1,8 @@
 import pickle
 from pickle import UnpicklingError
-from torch.utils.data import Dataset, DataLoader
+import torch
+from torch.utils.data import Dataset
+from data_utils import make_lm_encoder
 
 class HierLMExample(object):
     def __init__(self, seq_len):
@@ -41,6 +43,7 @@ class HierLMDataset(Dataset):
                     except (EOFError, UnpicklingError):
                         break
         # pack into sequence length
+        self.tokenizer, self.encoder = make_lm_encoder()
         self.examples = self.pack_examples(self.all_spans)
 
     def __len__(self):
@@ -50,9 +53,17 @@ class HierLMDataset(Dataset):
     def __getitem__(self, idx):
         # return packed sequence and run through bert model to encode
         # be careful with BERT attention masking
-        # TODO: bert, return array of vecs
-        # TODO: add targets
-        return self.examples[idx]
+        example = self.examples[idx]
+        tokenized_spans = self.tokenizer(example.text_spans, return_tensors="pt", padding=True,
+                                         truncation=True, max_length=512)
+        bert_vecs = self.encoder(**tokenized_spans)['last_hidden_state']
+        embedding_size = bert_vecs.size(2)
+        inputs = [torch.zeros(embedding_size)]
+        for i, sent_repr in  enumerate(example.reprs):
+            for _, indexes in sent_repr:
+                inputs.append(torch.mean(bert_vecs[i][indexes], axis=0))
+        inputs = torch.stack(inputs)
+        return inputs
 
     def pack_examples(self, all_spans):
         '''Add spans to an example until it's full.'''
@@ -64,5 +75,3 @@ class HierLMDataset(Dataset):
                 all_examples.append(example)
                 example = HierLMExample(self.seq_len)
         return all_examples
-
-# TODO: Define collate_fn to batch correctly

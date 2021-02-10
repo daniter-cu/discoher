@@ -3,16 +3,17 @@ import argparse
 import time
 import math
 import os
+import glob
 import torch
 import torch.nn as nn
-
+import numpy as np
+from torch.utils.data import DataLoader
+import data
 import model
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM/GRU/Transformer Language Model')
-parser.add_argument('--data', type=str, default='./data/wikitext-2',
+parser.add_argument('--data', type=str, default='../data/',
                     help='location of the data corpus')
-parser.add_argument('--model', type=str, default='LSTM',
-                    help='type of recurrent net (RNN_TANH, RNN_RELU, LSTM, GRU, Transformer)')
 parser.add_argument('--emsize', type=int, default=200,
                     help='size of word embeddings')
 parser.add_argument('--nhid', type=int, default=200,
@@ -47,6 +48,17 @@ parser.add_argument('--nhead', type=int, default=2,
 parser.add_argument('--dry-run', action='store_true',
                     help='verify the code and the model')
 
+DATANAME_WILDCARD = "*.pkl"
+
+def get_batch(batch):
+    # target data is the input data offset by 1
+    input_data = batch[:, :-1, :]
+    target_data = batch[:, 1:, :]
+    # change shape to (seq_len, batch, embed_size)
+    input_data = input_data.permute(1, 0, 2)
+    target_data = target_data.permute(1, 0, 2)
+    return input_data, target_data
+
 
 class ModelRunner():
     def __init__(self, cmd_line_args=[]):  # pylint: disable=dangerous-default-value
@@ -59,62 +71,99 @@ class ModelRunner():
 
         self.device = torch.device("cuda" if self.args.cuda else "cpu")
 
-        ###############################################################################
         # Build the model
-        ###############################################################################
-
-        self.model = model.TransformerModel(self.args.emsize, self.args.nhead, 
-                                            self.args.nhid, self.args.nlayers, 
+        self.model = model.TransformerModel(self.args.emsize, self.args.nhead,
+                                            self.args.nhid, self.args.nlayers,
                                             self.args.dropout).to(self.device)
-        self.criterion = nn.MSELoss() # nn.NLLLoss()
+        self.criterion = torch.nn.CrossEntropyLoss()
 
-    def evaluate(self, data_source):
+        # Data loader
+        data_files = glob.glob(self.args.data+"/"+DATANAME_WILDCARD)
+        self.training_dataset = data.HierLMDataset(data_files, self.args.bptt)
+        self.valid_dataset = data.HierLMDataset([data_files[0]], self.args.bptt)
+        self.data_loader = DataLoader(self.training_dataset, batch_size=self.args.batch_size,
+                                      shuffle=False, num_workers=0) # TODO: shuffle!!!
+        self.valid_data_loader = DataLoader(self.valid_dataset, batch_size=self.args.batch_size,
+                                            num_workers=0)
+
+
+    def evaluate(self):
         # Turn on evaluation mode which disables dropout.
         self.model.eval()
-        total_loss = 0.
-        ntokens = len(corpus.dictionary)
+        total = self.args.batch_size * self.args.bptt
+        batch_size = self.args.batch_size
+        losses = []
+        all_acc = []
+
         with torch.no_grad():
-            for i in range(0, data_source.size(0) - 1, args.bptt):
-                data, targets = get_batch(data_source, i)
-                output = self.model(data)
-                output = output.view(-1, ntokens)
-                total_loss += len(data) * self.criterion(output, targets).item()
-        return total_loss / (len(data_source) - 1)
+            for i, batch in enumerate(self.valid_data_loader):
+                input_data, target_data = get_batch(batch)
+                output = self.model(input_data)
+                logits = torch.matmul(output.reshape(-1, 768), target_data.reshape(-1, 768).t())
+
+                # Mask logits that are dot product between the same values
+                tmp = torch.diag_embed(torch.tensor([float('-inf')]*(total - 1)), offset=-1)  # pylint: disable=not-callable
+                index = torch.LongTensor([0]+ list(range(total-batch_size+1, total))+ list(range(1, total-batch_size+1)))
+                mask_self_dot = tmp[index]
+                logits = logits + mask_self_dot
+
+                labels = torch.tensor(list(range(total))) # pylint: disable=not-callable
+                loss = self.criterion(logits, labels)
+                acc = torch.sum(torch.argmax(logits, axis=1) == labels) / total
+                all_acc.append(acc.numpy())
+                losses.append(loss.item())
+        return np.mean(losses), np.mean(all_acc)
 
 
-    def train(self):
+    def train(self, epoch, max_batches=float('inf')):
         # Turn on training mode which enables dropout.
         self.model.train()
         total_loss = 0.
+        total = self.args.batch_size * self.args.bptt
+        batch_size = self.args.batch_size
+        all_acc = []
+
         start_time = time.time()
-        ntokens = len(corpus.dictionary)
-        for batch, i in enumerate(range(0, train_data.size(0) - 1, self.args.bptt)):
-            data, targets = get_batch(train_data, i)
+        for batch_index, batch in enumerate(self.data_loader):
+            input_data, target_data = get_batch(batch)
             # Starting each batch, we detach the hidden state from how it was previously produced.
             # If we didn't, the model would try backpropagating all the way to start of the dataset.
             self.model.zero_grad()
-            output = self.model(data)
-            output = output.view(-1, ntokens)
-            loss = self.criterion(output, targets)
+            output = self.model(input_data)
+            logits = torch.matmul(output.reshape(-1, 768), target_data.reshape(-1, 768).t())
+
+            # Mask logits that are dot product between the same values
+            tmp = torch.diag_embed(torch.tensor([float('-inf')]*(total - 1)), offset=-1)  # pylint: disable=not-callable
+            index = torch.LongTensor([0]+ list(range(total-batch_size+1, total))+ list(range(1, total-batch_size+1)))
+            mask_self_dot = tmp[index]
+            logits = logits + mask_self_dot
+
+            labels = torch.tensor(list(range(total))) # pylint: disable=not-callable
+            loss = self.criterion(logits, labels)
+            acc = torch.sum(torch.argmax(logits, axis=1) == labels) / total
+            all_acc.append(acc.numpy())
             loss.backward()
 
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip)
             for p in self.model.parameters():
-                p.data.add_(p.grad, alpha=-lr)
+                p.data.add_(p.grad, alpha=-self.args.lr)
 
             total_loss += loss.item()
 
-            if batch % self.args.log_interval == 0 and batch > 0:
+            if batch_index % self.args.log_interval == 0 and batch_index > 0:
                 cur_loss = total_loss / self.args.log_interval
                 elapsed = time.time() - start_time
-                print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
-                      'loss {:5.2f} | ppl {:8.2f}'.format(
-                          epoch, batch, len(train_data) // self.args.bptt, lr,
-                          elapsed * 1000 / self.args.log_interval, cur_loss, math.exp(cur_loss)))
+                print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.5f} | ms/batch {:5.2f} | '
+                      'loss {:5.2f} | acc {:1.5}'.format(
+                          epoch, batch_index, len(self.training_dataset) // self.args.bptt, self.args.lr,
+                          elapsed * 1000 / self.args.log_interval, cur_loss, np.mean(all_acc)))
                 total_loss = 0
+                all_acc = []
                 start_time = time.time()
             if self.args.dry_run:
+                break
+            if batch_index >= max_batches:
                 break
 
     def run(self):
