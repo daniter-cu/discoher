@@ -50,6 +50,8 @@ class HierLMDataset(Dataset):
     def __getitem__(self, idx):
         # return packed sequence and run through bert model to encode
         # be careful with BERT attention masking
+        # TODO: bert, return array of vecs
+        # TODO: add targets
         return self.examples[idx]
 
     def pack_examples(self, all_spans):

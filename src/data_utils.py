@@ -181,10 +181,12 @@ def srl_paragraphs(paragraphs):
     for ex_idx, example in enumerate(paragraphs):
         doc = nlp(example)
         for sent in doc.sents:
-            span = sent.text.strip()[:512*5]  # hack to not get sentences that are too long.
+            span = sent.text.strip()
             lm_tokenized_input = tokenizer(span, return_tensors='pt')
             srl_parse = predictor.predict(sentence=span)
             token_strs = tokenizer.convert_ids_to_tokens(lm_tokenized_input['input_ids'].numpy()[0])
+            if len(token_strs) >= 510:
+                continue
             try:
                 word2veclist = map_words_to_vectors(srl_parse['words'], token_strs)
             except NoStopException as e:
@@ -210,10 +212,12 @@ def srl_paragraphs_batched(paragraphs, batch_size=4):
     for ex_idx, example in enumerate(paragraphs):
         doc = nlp(example)
         for sent in doc.sents:
-            span = sent.text.strip()[:512*5]  # hack to not get sentences that are too long.
-            all_sents.append(span)
+            span = sent.text.strip()
             lm_tokenized_input = tokenizer(span, return_tensors='pt')
             token_strs = tokenizer.convert_ids_to_tokens(lm_tokenized_input['input_ids'].numpy()[0])
+            if len(token_strs) >= 510:
+                continue
+            all_sents.append(span)
             lm_tokenized_inputs.append(token_strs)
     batched_sentences = construct_batch(all_sents)
 
