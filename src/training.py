@@ -79,8 +79,8 @@ class ModelRunner():
 
         # Data loader
         data_files = glob.glob(self.args.data+"/"+DATANAME_WILDCARD)
-        self.training_dataset = data.HierLMDataset(data_files, self.args.bptt)
-        self.valid_dataset = data.HierLMDataset([data_files[0]], self.args.bptt)
+        self.training_dataset = data.HierLMDataset(data_files, self.args.bptt, self.device)
+        self.valid_dataset = data.HierLMDataset([data_files[0]], self.args.bptt, self.device)
         self.data_loader = DataLoader(self.training_dataset, batch_size=self.args.batch_size,
                                       shuffle=False, num_workers=0) # TODO: shuffle!!!
         self.valid_data_loader = DataLoader(self.valid_dataset, batch_size=self.args.batch_size,
@@ -137,7 +137,7 @@ class ModelRunner():
             self.model.zero_grad()
             start_model_time = time.time()
             output = self.model(input_data)
-            print("Run model", time.time() - start_model_time)
+            # print("Run model", time.time() - start_model_time)
             logits = torch.matmul(output.reshape(-1, 768), target_data.reshape(-1, 768).t())
 
             # Mask logits that are dot product between the same values
@@ -153,12 +153,12 @@ class ModelRunner():
             loss = self.criterion(logits, labels)
 
             acc = torch.sum(torch.argmax(logits, axis=1) == labels) / total
-            print("Run model + logits", time.time() - start_model_time)
+            # print("Run model + logits", time.time() - start_model_time)
 
             all_acc.append(acc.cpu().numpy())
             start_backprop = time.time()
             loss.backward()
-            print("backprop", time.time() - start_backprop)
+            # print("backprop", time.time() - start_backprop)
 
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip)

@@ -29,9 +29,10 @@ class HierLMExample(object):
         return self.current_len() != self.seq_len
 
 class HierLMDataset(Dataset):
-    def __init__(self, filenames, seq_len):
+    def __init__(self, filenames, seq_len, device):
 
         self.seq_len = seq_len
+        self.device = device
         # load data from all filenames
         self.all_spans = []
         for fname in filenames:
@@ -45,6 +46,7 @@ class HierLMDataset(Dataset):
         # pack into sequence length
         self.tokenizer, self.encoder = make_lm_encoder()
         self.encoder.eval()
+        self.encoder.to(self.device)
         self.examples = self.pack_examples(self.all_spans)
 
     def __len__(self):
@@ -56,7 +58,8 @@ class HierLMDataset(Dataset):
         # be careful with BERT attention masking
         example = self.examples[idx]
         tokenized_spans = self.tokenizer(example.text_spans, return_tensors="pt", padding=True,
-                                         truncation=True, max_length=512)
+                                         truncation=True, max_length=512).to(self.device)
+        
         with torch.no_grad():
             bert_vecs = self.encoder(**tokenized_spans)['last_hidden_state']
         embedding_size = bert_vecs.size(2)
