@@ -63,7 +63,7 @@ class HierLMDataset(Dataset):
         with torch.no_grad():
             bert_vecs = self.encoder(**tokenized_spans)['last_hidden_state']
         embedding_size = bert_vecs.size(2)
-        inputs = [torch.zeros(embedding_size)]
+        inputs = [torch.zeros(embedding_size).to(self.device)]
         for i, sent_repr in  enumerate(example.reprs):
             for _, indexes in sent_repr:
                 inputs.append(torch.mean(bert_vecs[i][indexes], axis=0))
