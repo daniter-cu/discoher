@@ -14,6 +14,8 @@ import model
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM/GRU/Transformer Language Model')
 parser.add_argument('--data', type=str, default='../data/',
                     help='location of the data corpus')
+parser.add_argument('--contrasts', type=int, default=4,
+                    help='Number of options in multiple choice.')
 parser.add_argument('--emsize', type=int, default=200,
                     help='size of word embeddings')
 parser.add_argument('--nhid', type=int, default=200,
@@ -129,7 +131,7 @@ class ModelRunner():
 
         start_time = time.time()
         for batch_index, batch in enumerate(self.data_loader):
-            print("Time to load data:", time.time() - start_time)
+            # print("Time to load data:", time.time() - start_time)
             batch = batch.to(self.device)
             input_data, target_data = get_batch(batch)
             # Starting each batch, we detach the hidden state from how it was previously produced.
@@ -148,8 +150,23 @@ class ModelRunner():
             mask_self_dot = tmp[index]
             logits = logits + mask_self_dot
 
-            labels = torch.tensor(list(range(total))) # pylint: disable=not-callable
+            # labels = torch.tensor(list(range(total))) # pylint: disable=not-callable
+            labels = torch.zeros(total, dtype=torch.long)
             labels = labels.to(self.device)
+
+            # Downsample logits for more reasonable window
+            np_negs = []
+            for i in range(total):
+                choices = list(range(total))
+                del choices[i]
+                np_negs.append(np.random.choice(choices, self.args.contrasts, replace=False))
+            np_negs = np.stack(np_negs)
+            np_trues = np.arange(total).reshape(total, 1)
+            all_options = np.concatenate([np_trues, np_negs], 1)
+            all_options = torch.tensor(all_options).to(self.device) # pylint: disable=not-callable
+
+            # downsample logits
+            logits = torch.gather(logits, 1, all_options)
             loss = self.criterion(logits, labels)
 
             acc = torch.sum(torch.argmax(logits, axis=1) == labels) / total
