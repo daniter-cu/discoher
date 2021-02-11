@@ -172,7 +172,7 @@ class ModelRunner():
                 elapsed = time.time() - start_time
                 print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.5f} | ms/batch {:5.2f} | '
                       'loss {:5.2f} | acc {:1.5}'.format(
-                          epoch, batch_index, len(self.training_dataset) // self.args.bptt, self.args.lr,
+                          epoch, batch_index, len(self.training_dataset) // self.args.batch_size, self.args.lr,
                           elapsed * 1000 / self.args.log_interval, cur_loss, np.mean(all_acc)))
                 total_loss = 0
                 all_acc = []
