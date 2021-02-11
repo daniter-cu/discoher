@@ -97,20 +97,24 @@ class ModelRunner():
 
         with torch.no_grad():
             for i, batch in enumerate(self.valid_data_loader):
+                batch = batch.to(self.device)
                 input_data, target_data = get_batch(batch)
                 output = self.model(input_data)
                 logits = torch.matmul(output.reshape(-1, 768), target_data.reshape(-1, 768).t())
 
                 # Mask logits that are dot product between the same values
                 tmp = torch.diag_embed(torch.tensor([float('-inf')]*(total - 1)), offset=-1)  # pylint: disable=not-callable
+                tmp = tmp.to(self.device)
                 index = torch.LongTensor([0]+ list(range(total-batch_size+1, total))+ list(range(1, total-batch_size+1)))
+                index = index.to(self.device)
                 mask_self_dot = tmp[index]
                 logits = logits + mask_self_dot
 
                 labels = torch.tensor(list(range(total))) # pylint: disable=not-callable
+                labels = labels.to(self.device)
                 loss = self.criterion(logits, labels)
                 acc = torch.sum(torch.argmax(logits, axis=1) == labels) / total
-                all_acc.append(acc.numpy())
+                all_acc.append(acc.cpu().numpy())
                 losses.append(loss.item())
         return np.mean(losses), np.mean(all_acc)
 
@@ -125,12 +129,15 @@ class ModelRunner():
 
         start_time = time.time()
         for batch_index, batch in enumerate(self.data_loader):
+            print("Time to load data:", time.time() - start_time)
             batch = batch.to(self.device)
             input_data, target_data = get_batch(batch)
             # Starting each batch, we detach the hidden state from how it was previously produced.
             # If we didn't, the model would try backpropagating all the way to start of the dataset.
             self.model.zero_grad()
+            start_model_time = time.time()
             output = self.model(input_data)
+            print("Run model", time.time() - start_model_time)
             logits = torch.matmul(output.reshape(-1, 768), target_data.reshape(-1, 768).t())
 
             # Mask logits that are dot product between the same values
@@ -146,8 +153,12 @@ class ModelRunner():
             loss = self.criterion(logits, labels)
 
             acc = torch.sum(torch.argmax(logits, axis=1) == labels) / total
+            print("Run model + logits", time.time() - start_model_time)
+
             all_acc.append(acc.cpu().numpy())
+            start_backprop = time.time()
             loss.backward()
+            print("backprop", time.time() - start_backprop)
 
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip)

@@ -44,6 +44,7 @@ class HierLMDataset(Dataset):
                         break
         # pack into sequence length
         self.tokenizer, self.encoder = make_lm_encoder()
+        self.encoder.eval()
         self.examples = self.pack_examples(self.all_spans)
 
     def __len__(self):
@@ -56,14 +57,15 @@ class HierLMDataset(Dataset):
         example = self.examples[idx]
         tokenized_spans = self.tokenizer(example.text_spans, return_tensors="pt", padding=True,
                                          truncation=True, max_length=512)
-        bert_vecs = self.encoder(**tokenized_spans)['last_hidden_state']
+        with torch.no_grad():
+            bert_vecs = self.encoder(**tokenized_spans)['last_hidden_state']
         embedding_size = bert_vecs.size(2)
         inputs = [torch.zeros(embedding_size)]
         for i, sent_repr in  enumerate(example.reprs):
             for _, indexes in sent_repr:
                 inputs.append(torch.mean(bert_vecs[i][indexes], axis=0))
         inputs = torch.stack(inputs)
-        return inputs
+        return inputs.detach().data
 
     def pack_examples(self, all_spans):
         '''Add spans to an example until it's full.'''
