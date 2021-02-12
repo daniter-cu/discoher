@@ -42,6 +42,8 @@ parser.add_argument('--cuda', action='store_true',
                     help='use CUDA')
 parser.add_argument('--log-interval', type=int, default=200, metavar='N',
                     help='report interval')
+parser.add_argument('--save_interval', type=int, default=500, metavar='N',
+                    help='report interval')
 parser.add_argument('--save', type=str, default='../checkpoints/model.pt',
                     help='path to save the final model')
 
@@ -201,10 +203,19 @@ class ModelRunner():
                 total_loss = 0
                 all_acc = []
                 start_time = time.time()
+            if batch_index % self.args.save_interval == 0 and batch_index > 0:
+                with open(self.args.save, 'wb') as f:
+                        
+                        torch.save(model, f)
             if self.args.dry_run:
                 break
             if batch_index >= max_batches:
                 break
+
+    def checkpoint_name(self, epoch, batch_index, save_name):
+        name = "chkpt-%d-%d-" % (epoch, batch_index)
+        path, base = os.path.split(save_name)
+        return path + "/" + name + base
 
     def run(self):
         # Loop over epochs.
@@ -246,5 +257,6 @@ class ModelRunner():
         # print('=' * 89)
 
 if __name__ == "__main__":
+    print("args:", sys.argv)
     runner = ModelRunner(sys.argv[1:])
     runner.run()
