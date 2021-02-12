@@ -204,9 +204,8 @@ class ModelRunner():
                 all_acc = []
                 start_time = time.time()
             if batch_index % self.args.save_interval == 0 and batch_index > 0:
-                with open(self.args.save, 'wb') as f:
-                        
-                        torch.save(model, f)
+                with open(self.checkpoint_name(epoch, batch_index, self.args.save), 'wb') as f:
+                    torch.save(self.model, f)
             if self.args.dry_run:
                 break
             if batch_index >= max_batches:
@@ -235,8 +234,8 @@ class ModelRunner():
                 # Save the model if the validation loss is the best we've seen so far.
                 if not best_val_loss or val_loss < best_val_loss:
                     # Model checkpointing
-                    with open(self.args.save, 'wb') as f:
-                        torch.save(model, f)
+                    with open(self.checkpoint_name(epoch, 0, self.args.save), 'wb') as f:
+                        torch.save(self.model, f)
                     best_val_loss = val_loss
                 else:
                     # Anneal the learning rate if no improvement has been seen in the validation dataset.
