@@ -59,7 +59,7 @@ class HierLMDataset(Dataset):
         example = self.examples[idx]
         tokenized_spans = self.tokenizer(example.text_spans, return_tensors="pt", padding=True,
                                          truncation=True, max_length=512).to(self.device)
-        
+
         with torch.no_grad():
             bert_vecs = self.encoder(**tokenized_spans)['last_hidden_state']
         embedding_size = bert_vecs.size(2)
