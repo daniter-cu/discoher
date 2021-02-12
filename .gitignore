@@ -3,3 +3,4 @@
 __pycache__/
 *.pkl
 daniter-job-*.out
+*.out
