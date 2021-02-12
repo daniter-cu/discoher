@@ -14,7 +14,7 @@ import model
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM/GRU/Transformer Language Model')
 parser.add_argument('--train_data', type=str, default='../data/train/',
                     help='location of the data corpus')
-parser.add_argument('--valid_data', type=str, default='../data/val/',
+parser.add_argument('--val_data', type=str, default='../data/val/',
                     help='location of the data corpus')
 parser.add_argument('--contrasts', type=int, default=4,
                     help='Number of options in multiple choice.')
@@ -246,5 +246,5 @@ class ModelRunner():
         # print('=' * 89)
 
 if __name__ == "__main__":
-    runner = ModelRunner(sys.argv)
+    runner = ModelRunner(sys.argv[1:])
     runner.run()
