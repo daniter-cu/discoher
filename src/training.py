@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 import torch
+from tqdm import tqdm
 import numpy as np
 from torch.utils.data import DataLoader
 import data
@@ -107,7 +108,7 @@ class ModelRunner():
         all_acc = []
 
         with torch.no_grad():
-            for _, batch in enumerate(self.valid_data_loader):
+            for _, batch in tqdm(enumerate(self.valid_data_loader), total=len(self.valid_dataset)):
                 batch = batch.to(self.device)
                 input_data, target_data = get_batch(batch)
                 output = self.model(input_data)
