@@ -47,7 +47,8 @@ parser.add_argument('--save_interval', type=int, default=500, metavar='N',
                     help='report interval')
 parser.add_argument('--save', type=str, default='../checkpoints/model.pt',
                     help='path to save the final model')
-
+parser.add_argument('--restore', type=str, default='../checkpoints/chkpt-1-2000-model.pt',
+                    help='path to save the final model')
 parser.add_argument('--nhead', type=int, default=2,
                     help='the number of heads in the encoder/decoder of the transformer model')
 parser.add_argument('--dry-run', action='store_true',
@@ -83,9 +84,13 @@ class ModelRunner():
         self.device = torch.device("cuda" if self.args.cuda else "cpu")
 
         # Build the model
-        self.model = model.TransformerModel(self.args.emsize, self.args.nhead,
-                                            self.args.nhid, self.args.nlayers,
-                                            self.args.dropout).to(self.device)
+        if self.args.restore:
+            with open(self.args.restore, 'rb') as f:
+                self.model = torch.load(f, map_location=self.device)
+        else:
+            self.model = model.TransformerModel(self.args.emsize, self.args.nhead,
+                                                self.args.nhid, self.args.nlayers,
+                                                self.args.dropout).to(self.device)
         self.criterion = torch.nn.CrossEntropyLoss()
 
         # Data loader
@@ -99,7 +104,7 @@ class ModelRunner():
                                             num_workers=0)
 
 
-    def evaluate(self):
+    def evaluate(self, max_batches=float('inf')):
         # Turn on evaluation mode which disables dropout.
         self.model.eval()
         total = self.args.batch_size * self.args.bptt
@@ -108,7 +113,7 @@ class ModelRunner():
         all_acc = []
 
         with torch.no_grad():
-            for _, batch in tqdm(enumerate(self.valid_data_loader), total=len(self.valid_dataset)):
+            for batch_idx, batch in tqdm(enumerate(self.valid_data_loader), total=len(self.valid_dataset)):
                 batch = batch.to(self.device)
                 input_data, target_data = get_batch(batch)
                 output = self.model(input_data)
@@ -128,6 +133,8 @@ class ModelRunner():
                 acc = torch.sum(torch.argmax(logits, axis=1) == labels) / total
                 all_acc.append(acc.cpu().numpy())
                 losses.append(loss.item())
+                if batch_idx > max_batches:
+                    break
         return np.mean(losses), np.mean(all_acc)
 
 
