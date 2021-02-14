@@ -214,9 +214,8 @@ class ModelRunner():
             if batch_index % self.args.save_interval == 0 and batch_index > 0:
                 val_loss, val_acc = self.evaluate(10)
                 print('-' * 89)
-                print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
-                      'valid acc {:2.2f}'.format(epoch, (time.time() - epoch_start_time),
-                                                 val_loss, val_acc))
+                print('| end of epoch {:3d} | valid loss {:5.2f} | '
+                      'valid acc {:2.2f}'.format(epoch, val_loss, val_acc))
                 with open(self.checkpoint_name(epoch, batch_index, self.args.save), 'wb') as f:
                     torch.save(self.model, f)
             if self.args.dry_run:
