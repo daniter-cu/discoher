@@ -157,7 +157,7 @@ def make_lm_encoder():
     return tokenizer, model
 
 def make_allennlp():
-    predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/structured-prediction-srl-bert.2020.12.15.tar.gz", 
+    predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/structured-prediction-srl-bert.2020.12.15.tar.gz",
                                     cuda_device=torch.cuda.current_device() if torch.cuda.is_available() else -1)
     return predictor
 
