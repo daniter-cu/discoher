@@ -152,6 +152,73 @@ class ModelRunner():
                     break
         return np.mean(losses), np.mean(all_acc)
 
+    def mask_logits(self, logits, total, batch_size=1):
+        tmp = torch.diag_embed(torch.tensor([float('-inf')]*(total - 1)), offset=-1)  # pylint: disable=not-callable
+        tmp = tmp.to(self.device)
+        index = torch.LongTensor([0]+ list(range(total-batch_size+1, total))+ list(range(1, total-batch_size+1)))
+        index = index.to(self.device)
+        mask_self_dot = tmp[index]
+        # print(logits.shape)
+        # print(mask_self_dot.shape)
+        logits = logits + mask_self_dot
+        return logits
+
+    def create_contrastive_samples(self, total):
+        np_negs = []
+        for i in range(total):
+            choices = list(range(total))
+            del choices[i]
+            contrast_size = min(len(choices), self.args.contrasts)
+            np_negs.append(np.random.choice(choices, contrast_size, replace=False))
+        np_negs = np.stack(np_negs)
+        np_trues = np.arange(total).reshape(total, 1)
+        all_options = np.concatenate([np_trues, np_negs], 1)
+        all_options = torch.tensor(all_options).to(self.device) # pylint: disable=not-callable
+        return all_options
+
+    def evaluate_bso(self, data_loader, max_batches=float('inf')):
+        # Turn on evaluation mode which disables dropout.
+        self.model.eval()
+        all_acc = []
+
+        with torch.no_grad():
+            for batch_idx, batch in tqdm(enumerate(data_loader), total=len(data_loader)):
+                true_batch = batch[True]
+                false_batch = batch[False]
+                # print("Batch shape", true_batch.shape)
+                total = true_batch.shape[1] - 1 # Minus 1 because we add dummy start and last target
+                if total == 0:
+                    continue
+                true_batch = true_batch.to(self.device)
+                false_batch = false_batch.to(self.device)
+                true_input_data, true_target_data = get_batch(true_batch)
+                false_input_data, false_target_data = get_batch(false_batch)
+                true_output = self.model(true_input_data)
+                false_output = self.model(false_input_data)
+                true_logits = torch.matmul(true_output.reshape(-1, 768), true_target_data.reshape(-1, 768).t())
+                false_logits = torch.matmul(false_output.reshape(-1, 768), false_target_data.reshape(-1, 768).t())
+
+                # Mask logits that are dot product between the same values
+                true_logits = self.mask_logits(true_logits, total)
+                false_logits = self.mask_logits(false_logits, total)
+
+                labels = torch.zeros(total, dtype=torch.long)
+                labels = labels.to(self.device)
+
+                # Downsample logits for more reasonable window
+                all_options = self.create_contrastive_samples(total)
+                # TODO: Can we reuse this? Maybe not?
+
+                # downsample logits
+                true_logits = torch.gather(true_logits, 1, all_options)
+                false_logits = torch.gather(false_logits, 1, all_options)
+
+                true_loss = self.criterion(true_logits, labels).item()
+                false_loss = self.criterion(false_logits, labels).item()
+                all_acc.append(true_loss < false_loss)
+                if batch_idx > max_batches:
+                    break
+        return np.mean(all_acc)
 
     def train(self, epoch, max_batches=float('inf')):
         # Turn on training mode which enables dropout.
