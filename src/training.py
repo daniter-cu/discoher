@@ -212,6 +212,7 @@ class ModelRunner():
                 all_acc = []
                 start_time = time.time()
             if batch_index % self.args.save_interval == 0 and batch_index > 0:
+                self.evaluate(10)
                 with open(self.checkpoint_name(epoch, batch_index, self.args.save), 'wb') as f:
                     torch.save(self.model, f)
             if self.args.dry_run:
