@@ -1,6 +1,8 @@
 import logging
 import unicodedata
 import pickle
+import csv
+import sys
 from collections import defaultdict
 import torch
 import tensorflow_datasets as tfds
@@ -155,7 +157,8 @@ def make_lm_encoder():
     return tokenizer, model
 
 def make_allennlp():
-    predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/structured-prediction-srl-bert.2020.12.15.tar.gz", cuda_device=torch.cuda.current_device())
+    predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/structured-prediction-srl-bert.2020.12.15.tar.gz", 
+                                    cuda_device=torch.cuda.current_device() if torch.cuda.is_available() else -1)
     return predictor
 
 def get_paragraphs(datum):
@@ -202,6 +205,12 @@ def srl_paragraphs(paragraphs):
 def construct_batch(sents):
     return [{"sentence": s} for s in sents]
 
+def construct_batch_nested(examples):
+    batched_sents = []
+    for ex in examples:
+        batched_sents.append([{"sentence": s} for s in ex])
+    return batched_sents
+
 def srl_paragraphs_batched(paragraphs, batch_size=4):
     nlp = create_nlp()
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -240,6 +249,60 @@ def srl_paragraphs_batched(paragraphs, batch_size=4):
         reprs.append((span, sent_repr))
     return reprs
 
+def srl_paragraphs_batched_xu(paragraphs, batch_size=4):
+    '''Same as function above but keep the examples together.'''
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    predictor = make_allennlp()
+    reprs = [] # this is a list of examples
+    all_sents = [] # this is a list of examples
+    lm_tokenized_inputs = [] # this is a list of examples
+
+    # For each example, for each sentence, tokenize the sentence
+    # sents and lm_tok_inputs are parallel lists
+    # create batched setences to feed to srl efficiently but keep example grouping
+    for ex_idx, example in enumerate(paragraphs):
+        per_example_sents = []
+        per_example_lm_tokenized_inputs = []
+        for sent in example:
+            span = sent.strip()
+            lm_tokenized_input = tokenizer(span, return_tensors='pt')
+            token_strs = tokenizer.convert_ids_to_tokens(lm_tokenized_input['input_ids'].numpy()[0])
+            if len(token_strs) >= 510:
+                print("Warning, dropping long sentence from eval set.")
+                continue
+            per_example_sents.append(span)
+            per_example_lm_tokenized_inputs.append(token_strs)
+        all_sents.append(per_example_sents)
+        lm_tokenized_inputs.append(per_example_lm_tokenized_inputs)
+    batched_sentences_group_by_example = construct_batch_nested(all_sents)
+
+    # Parse in batches
+    srl_parses = []
+    for batched_sentences in batched_sentences_group_by_example:
+        srl_parses_per_example = []
+        for i in range(0, len(batched_sentences), batch_size):
+            srl_parses_batch = predictor.predict_batch_json(inputs=batched_sentences[i:i+batch_size])
+            srl_parses_per_example.extend(srl_parses_batch)
+        srl_parses.append(srl_parses_per_example)
+
+    for ex_idx, example in enumerate(srl_parses):
+        per_example_repr = []
+        for parse_idx, srl_parse in enumerate(example):
+            span = all_sents[ex_idx][parse_idx]
+            token_strs = lm_tokenized_inputs[ex_idx][parse_idx]
+            try:
+                word2veclist = map_words_to_vectors(srl_parse['words'], token_strs)
+            except NoStopException as e:
+                logging.warning("Index  %s", ex_idx)
+                logging.warning(e)
+                logging.warning(token_strs)
+                logging.warning(srl_parse['words'])
+                continue
+            sent_repr = build_repr(srl_parse['verbs'], word2veclist)
+            per_example_repr.append((span, sent_repr))
+        reprs.append(per_example_repr)
+    return reprs
+
 def serialize_reprs(reprs, fname):
     with open(fname, 'wb') as f:
         pickler = pickle.Pickler(f)
@@ -248,3 +311,12 @@ def serialize_reprs(reprs, fname):
     # f = open(fname, 'rb')
     # unpickler = pickle.Unpickler(f)
     # unpickler.load()
+
+def get_xu_data(path):
+    csv.field_size_limit(sys.maxsize)
+    examples = []
+    with open(path) as f:
+        reader = csv.reader(f, delimiter="\t")
+        for row in reader:
+            examples.append(row[1].split("<PUNC>"))
+    return examples
