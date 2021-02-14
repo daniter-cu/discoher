@@ -127,8 +127,23 @@ class ModelRunner():
                 mask_self_dot = tmp[index]
                 logits = logits + mask_self_dot
 
-                labels = torch.tensor(list(range(total))) # pylint: disable=not-callable
+                labels = torch.zeros(total, dtype=torch.long)
                 labels = labels.to(self.device)
+
+                # Downsample logits for more reasonable window
+                np_negs = []
+                for i in range(total):
+                    choices = list(range(total))
+                    del choices[i]
+                    np_negs.append(np.random.choice(choices, self.args.contrasts, replace=False))
+                np_negs = np.stack(np_negs)
+                np_trues = np.arange(total).reshape(total, 1)
+                all_options = np.concatenate([np_trues, np_negs], 1)
+                all_options = torch.tensor(all_options).to(self.device) # pylint: disable=not-callable
+
+                # downsample logits
+                logits = torch.gather(logits, 1, all_options)
+
                 loss = self.criterion(logits, labels)
                 acc = torch.sum(torch.argmax(logits, axis=1) == labels) / total
                 all_acc.append(acc.cpu().numpy())
