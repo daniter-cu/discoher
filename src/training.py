@@ -47,7 +47,7 @@ parser.add_argument('--save_interval', type=int, default=500, metavar='N',
                     help='report interval')
 parser.add_argument('--save', type=str, default='../checkpoints/model.pt',
                     help='path to save the final model')
-parser.add_argument('--restore', type=str, default='../checkpoints/chkpt-1-2000-model.pt',
+parser.add_argument('--restore', type=str, default=None,
                     help='path to save the final model')
 parser.add_argument('--nhead', type=int, default=2,
                     help='the number of heads in the encoder/decoder of the transformer model')
@@ -212,7 +212,11 @@ class ModelRunner():
                 all_acc = []
                 start_time = time.time()
             if batch_index % self.args.save_interval == 0 and batch_index > 0:
-                self.evaluate(10)
+                val_loss, val_acc = self.evaluate(10)
+                print('-' * 89)
+                print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+                      'valid acc {:2.2f}'.format(epoch, (time.time() - epoch_start_time),
+                                                 val_loss, val_acc))
                 with open(self.checkpoint_name(epoch, batch_index, self.args.save), 'wb') as f:
                     torch.save(self.model, f)
             if self.args.dry_run:
