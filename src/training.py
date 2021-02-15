@@ -65,7 +65,6 @@ def get_batch(batch):
     target_data = target_data.permute(1, 0, 2)
     return input_data, target_data
 
-
 class ModelRunner():
     def __init__(self, cmd_line_args=[]):  # pylint: disable=dangerous-default-value
         self.args = parser.parse_args(cmd_line_args)
@@ -218,6 +217,74 @@ class ModelRunner():
                 all_acc.append(true_loss < false_loss)
                 if batch_idx > max_batches:
                     break
+        return np.mean(all_acc)
+
+    def get_insertion_batch(self, batch, i, j):
+        # A batch is a list of [batch_size, seq_len, embed_dim]
+        # We need to add a dummy start token and permute
+        # i, j are for reordering sentences
+        moved_sent = batch[i]
+        other_sents = batch[:i] + batch[i+1:]
+        before_sents = other_sents[:j]
+        after_sents = other_sents[j:]
+        dummy_start = torch.zeros_like(moved_sent).to(self.device)
+        new_order = [dummy_start] + before_sents + [moved_sent] + after_sents
+        assert len(new_order) == len(batch) + 1, (len(new_order), len(batch) + 1)
+        new_order_batch = torch.cat(new_order, dim=1)
+        return get_batch(new_order_batch)
+
+    def evaluate_insertion(self, data_loader, max_batches=float('inf')):
+        # Turn on evaluation mode which disables dropout.
+        self.model.eval()
+        all_acc = []
+        with torch.no_grad():
+            for batch_idx, batch in tqdm(enumerate(data_loader), total=len(data_loader)):
+                all_false_losses = []
+                if batch_idx > max_batches:
+                    break
+                # create a correct order batch and store the loss
+                # iterate over sents, over positions, skip correct
+                # collect all losses
+                # add 1 for each loss above correct and 0 for each loss below
+                true_input, true_targets = self.get_insertion_batch(batch, 0, 0)
+                if true_input.shape[0] > 512:
+                    print("Batch size", true_input.shape)
+                true_input = true_input.to(self.device)
+                true_targets = true_targets.to(self.device)
+                total = true_targets.shape[0]
+                output = self.model(true_input)
+                true_logits = torch.matmul(output.reshape(-1, 768), true_targets.reshape(-1, 768).t())
+                true_logits = self.mask_logits(true_logits, total)
+                labels = torch.zeros(total, dtype=torch.long)
+                labels = labels.to(self.device)
+
+                # Downsample logits for more reasonable window
+                all_options = self.create_contrastive_samples(total)
+                # downsample logits
+                true_logits = torch.gather(true_logits, 1, all_options)
+                true_loss = self.criterion(true_logits, labels).item()
+                for i in range(len(batch)):
+                    for j in range(len(batch)):
+                        if i == j:
+                            continue
+                    inputs, targets = self.get_insertion_batch(batch, i, j)
+                    inputs = inputs.to(self.device)
+                    targets = targets.to(self.device)
+                    total = targets.shape[0]
+                    output = self.model(inputs)
+                    logits = torch.matmul(output.reshape(-1, 768), targets.reshape(-1, 768).t())
+                    logits = self.mask_logits(logits, total)
+                    labels = torch.zeros(total, dtype=torch.long)
+                    labels = labels.to(self.device)
+
+                    # Downsample logits for more reasonable window
+                    all_options = self.create_contrastive_samples(total)
+                    # downsample logits
+                    logits = torch.gather(logits, 1, all_options)
+                    loss = self.criterion(logits, labels).item()
+                    all_false_losses.append(loss)
+                for loss in all_false_losses:
+                    all_acc.append(1 if loss > true_loss else 0)
         return np.mean(all_acc)
 
     def train(self, epoch, max_batches=float('inf')):

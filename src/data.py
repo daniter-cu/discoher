@@ -107,7 +107,7 @@ class BSODataset(HierLMDataset):
         '''Add spans to an example until it's full.'''
         all_examples = []
         for i in range(len(all_spans) - 1):
-            example = BSOExample(all_spans[i], all_spans[i+1], self.seq_len, )
+            example = BSOExample(all_spans[i], all_spans[i+1], self.seq_len)
             all_examples.append(example)
         return all_examples
 
@@ -130,3 +130,41 @@ class BSOExample(object):
         reprs = ([flat_repr1, flat_repr2], [flat_repr2 + flat_repr1])
         text_spans = [text1, text2]
         return reprs, text_spans
+
+class InsertionDataset(HierLMDataset):
+    def __getitem__(self, idx):
+        # return packed sequence and run through bert model to encode
+        # be careful with BERT attention masking
+        example = self.examples[idx]
+        tokenized_spans = self.tokenizer(example.text_spans, return_tensors="pt", padding=True,
+                                         truncation=True, max_length=512).to(self.device)
+
+        with torch.no_grad():
+            bert_vecs = self.encoder(**tokenized_spans)['last_hidden_state']
+        all_sents = []
+        for i, sent_repr in enumerate(example.reprs):
+            inputs = []
+            if len(sent_repr) == 0:
+                sent_repr = [('Dummy', list(range(bert_vecs[i].shape[0] - 2)))]
+            for _, indexes in sent_repr:
+                inputs.append(torch.mean(bert_vecs[i][indexes], axis=0))
+            inputs = torch.stack(inputs).detach().data
+            all_sents.append(inputs)
+        return all_sents
+
+    def pack_examples(self, all_spans):
+        '''Add spans to an example until it's full.'''
+        all_examples = []
+        for picked_repr in all_spans:
+            example = InsertionExample(picked_repr, self.seq_len)
+            all_examples.append(example)
+        return all_examples
+
+class InsertionExample(object):
+    def __init__(self, picked_repr, seq_len):
+        self.seq_len = seq_len
+        self.text_spans = []
+        self.reprs = []
+        for span, rpr in picked_repr:
+            self.text_spans.append(span)
+            self.reprs.append([r for vec_repr in rpr for r in vec_repr])
