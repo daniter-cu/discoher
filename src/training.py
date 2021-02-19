@@ -298,6 +298,8 @@ class ModelRunner():
         start_time = time.time()
         for batch_index, batch in enumerate(self.data_loader):
             # print("Time to load data:", time.time() - start_time)
+            if batch.shape[0] != self.args.batch_size or batch.shape[1] != self.args.bptt:
+                continue
             batch = batch.to(self.device)
             input_data, target_data = get_batch(batch)
             # Starting each batch, we detach the hidden state from how it was previously produced.
