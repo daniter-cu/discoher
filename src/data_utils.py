@@ -8,7 +8,7 @@ import torch
 import tensorflow_datasets as tfds
 from spacy.lang.en import English
 from transformers import BertTokenizer, BertModel
-from allennlp.predictors.predictor import Predictor
+# from allennlp.predictors.predictor import Predictor
 
 
 SPECIAL_CHARS = ['-', '.', '\'', ',', '’', '/', ':', '–', '(', '&']

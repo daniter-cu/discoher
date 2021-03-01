@@ -5,6 +5,7 @@
 `conda create -n discoher python=3.7.9`
 
 `conda install -c anaconda tensorflow-datasets`
+`pip install tensorflow=2.1`
 `pip install tfds-nightly`
 
 Install spacy model   
