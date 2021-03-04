@@ -54,7 +54,7 @@ def  main(args):
     # TODO: check uninitialized weights
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    configs = {"gpt": get_gpt,
+    configs = {# "gpt": get_gpt,
                "gpt2": get_gpt2,
                "tranxl": get_tranxl} #,
                # "xlnet": get_xlnet}
@@ -67,6 +67,7 @@ def  main(args):
         loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
 
         done = False
+        count = 0
         while not done:
             tokenized_paras = []
             for para in paragraphs:
@@ -92,6 +93,9 @@ def  main(args):
                     # Flatten the tokens
                     loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
                 save_results(loss.cpu().numpy(), args.save, name)
+                count += 1
+                if count > 3000:
+                    break
     return
 
 def save_results(loss, savefile, key_name):
