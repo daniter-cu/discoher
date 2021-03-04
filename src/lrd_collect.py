@@ -85,13 +85,13 @@ def  main(args):
             with torch.no_grad():
                 out = model(tokenized_paras, labels=tokenized_paras, return_dict=True)
                 if name == "tranxl":
-                    loss = out.losses
+                    loss = out.losses.cpu()
                 else:
                     shift_logits = out.logits[..., :-1, :].contiguous()
                     shift_labels = tokenized_paras[..., 1:].contiguous()
                     # Flatten the tokens
                     loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-                save_results(loss.numpy(), args.save, name)
+                save_results(loss.cpu().numpy(), args.save, name)
     return
 
 def save_results(loss, savefile, key_name):
