@@ -43,8 +43,8 @@ def main():
         indexed_tokens = tokenizer.encode(" ".join(para), return_tensors="pt", truncation=True, max_length=512)
         indexed_tokens = indexed_tokens[:, :512].to(device)
         with torch.no_grad():
-            loss = model(indexed_tokens, labels=indexed_tokens, return_dict=True).loss
-        true_loss = loss
+            loss = model(indexed_tokens, labels=indexed_tokens, return_dict=True).losses
+        true_loss = torch.mean(loss).cpu().numpy()
         false_losses = []
         for i in range(len(para)):
             for j in range(len(para)):
@@ -58,8 +58,8 @@ def main():
                 indexed_tokens = tokenizer.encode(" ".join(new_order), return_tensors="pt", truncation=True, max_length=512)
                 indexed_tokens = indexed_tokens[:, :512].to(device)
                 with torch.no_grad():
-                    loss = model(indexed_tokens, labels=indexed_tokens, return_dict=True).loss
-                false_losses.append(loss)
+                    loss = model(indexed_tokens, labels=indexed_tokens, return_dict=True).losses
+                false_losses.append(torch.mean(loss).cpu().numpy())
         for loss in false_losses:
             all_acc.append(1 if loss > true_loss else 0)
         print("Currently at", np.mean(all_acc))
