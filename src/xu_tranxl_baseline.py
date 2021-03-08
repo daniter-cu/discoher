@@ -34,13 +34,15 @@ def get_tok_and_model(device):
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(device)
 
     paragraphs = get_paragraphs()
     tokenizer, model = get_tok_and_model(device)
 
     all_acc = []
     for para in tqdm(paragraphs):
-        indexed_tokens = tokenizer.encode(" ".join(para), return_tensors="pt", truncation=True, max_length=512)
+        print(len(all_acc))
+        indexed_tokens = tokenizer.encode(" ".join(para), return_tensors="pt")
         indexed_tokens = indexed_tokens[:, :512].to(device)
         with torch.no_grad():
             loss = model(indexed_tokens, labels=indexed_tokens, return_dict=True).losses
@@ -55,7 +57,7 @@ def main():
                 before_sents = other_sents[:j]
                 after_sents = other_sents[j:]
                 new_order = before_sents + [moved_sent] + after_sents
-                indexed_tokens = tokenizer.encode(" ".join(new_order), return_tensors="pt", truncation=True, max_length=512)
+                indexed_tokens = tokenizer.encode(" ".join(new_order), return_tensors="pt")
                 indexed_tokens = indexed_tokens[:, :512].to(device)
                 with torch.no_grad():
                     loss = model(indexed_tokens, labels=indexed_tokens, return_dict=True).losses
@@ -63,6 +65,7 @@ def main():
         for loss in false_losses:
             all_acc.append(1 if loss > true_loss else 0)
         print("Currently at", np.mean(all_acc))
+        sys.stdout.flush()
     print(np.mean(all_acc))
 
 if __name__ == "__main__":
