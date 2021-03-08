@@ -9,13 +9,15 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from transformers import XLNetTokenizer, XLNetLMHeadModel
 from transformers import TransfoXLTokenizer, TransfoXLLMHeadModel
 
-parser = argparse.ArgumentParser(description='Batch process wiki40b text into paragraph and SRL.')
-parser.add_argument('--save', type=str, default='../results/results.npy',
+parser = argparse.ArgumentParser(description='Collect per positions losses.')
+parser.add_argument('--save', type=str, default='../results/results_books.npy',
                     help='Name of save file')
 parser.add_argument('--data', type=str, default='../data/wiki40b/',
                     help='Path to data')
 parser.add_argument('--batch', type=int, default=16,
                     help='Batch size for SRL parser.')
+parser.add_argument('--dataset', type=str, default='books',
+                    choices=['books','wiki'], help='Dataset type')
 args = parser.parse_args()
 
 def get_gpt():
@@ -42,7 +44,7 @@ def get_xlnet(): # Doesn't work
     model.eval()
     return tokenizer, model
 
-def get_data(path):
+def get_wiki_data(path):
     files = glob.glob(path+"/*")
     for fname in files:
         with open(fname, "rb") as buf:
@@ -50,11 +52,36 @@ def get_data(path):
             for unpacked in unpacker:
                 yield unpacked
 
+def get_books_data(path):
+    data = []
+    collect = True
+    with open(path, "r") as f:
+        one_book = []
+        for i, line in enumerate(f):
+            if collect:
+                one_book.append(line)
+                if len(one_book) == 50:
+                    data.append(one_book)
+                    one_book = []
+                    collect = False
+            if i % 10000 == 0:
+                collect = True
+    all_data = []
+    for book in data:
+        lines = " ".join([l.strip() for l in book])
+        all_data.append(lines)
+    return all_data[1:]
+
 def  main(args):
     # TODO: check uninitialized weights
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    configs = {# "gpt": get_gpt,
+    if args.dataset == "books":
+        get_data = get_books_data
+    else:
+        get_data = get_wiki_data
+
+    configs = {"gpt": get_gpt,
                "gpt2": get_gpt2,
                "tranxl": get_tranxl} #,
                # "xlnet": get_xlnet}
