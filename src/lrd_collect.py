@@ -14,10 +14,10 @@ parser.add_argument('--save', type=str, default='../results/results_books.npy',
                     help='Name of save file')
 parser.add_argument('--data', type=str, default='../data/wiki40b/',
                     help='Path to data')
-parser.add_argument('--batch', type=int, default=16,
+parser.add_argument('--batch', type=int, default=8,
                     help='Batch size for SRL parser.')
 parser.add_argument('--dataset', type=str, default='books',
-                    choices=['books','wiki'], help='Dataset type')
+                    choices=['books', 'wiki', 'litbank'], help='Dataset type')
 args = parser.parse_args()
 
 def get_gpt():
@@ -72,12 +72,45 @@ def get_books_data(path):
         all_data.append(lines)
     return all_data[1:]
 
+def get_litbank_data(path):
+    litbank_file = glob.glob(path + "*")
+    data = []
+    for fname in litbank_file:
+        book = []
+        section = []
+        with open(fname, "r") as f:
+            spaces = 0
+            for line in f:
+                if line.isspace():
+                    spaces += 1
+                else:
+                    if spaces < 2:
+                        section.append(line.strip())
+                    else:
+                        book.append(section)
+                        section = []
+                        section.append(line.strip())
+                    spaces = 0
+            if section:
+                book.append(section)
+        data.append(book)
+    
+    all_data = []
+    for book in data:
+        new_book = [" ".join(sec) for sec in book if len(sec) > 50]
+        all_data.append(new_book)
+        
+    all_data = [sec for book in all_data for sec in book]
+    return all_data
+
 def  main(args):
     # TODO: check uninitialized weights
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if args.dataset == "books":
         get_data = get_books_data
+    elif args.dataset == "litbank":
+        get_data = get_litbank_data
     else:
         get_data = get_wiki_data
 
