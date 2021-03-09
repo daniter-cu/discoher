@@ -17,7 +17,7 @@ parser.add_argument('--data', type=str, default='../data/wiki40b/',
 parser.add_argument('--batch', type=int, default=8,
                     help='Batch size for SRL parser.')
 parser.add_argument('--dataset', type=str, default='books',
-                    choices=['books', 'wiki', 'litbank'], help='Dataset type')
+                    choices=['books', 'wiki', 'litbank', 'research'], help='Dataset type')
 args = parser.parse_args()
 
 def get_gpt():
@@ -103,6 +103,22 @@ def get_litbank_data(path):
     all_data = [sec for book in all_data for sec in book]
     return all_data
 
+def get_research_data(path):
+    filenames = glob.glob(path+"/*.json")
+    all_intros = []
+    for path in filenames:
+        with open(path, "r") as f:
+            doc = json.load(f)
+            intro = []
+            for ent in doc['body_text']:
+                if "Introduction" == ent['title']:
+                    intro.append((ent['startOffset'], ent['sentence']))
+            intro = sorted(intro)
+            intro = [b for a,b in intro]
+            intro = " ".join(intro)
+            all_intros.append(intro)
+    return all_intros
+
 def  main(args):
     # TODO: check uninitialized weights
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -111,6 +127,8 @@ def  main(args):
         get_data = get_books_data
     elif args.dataset == "litbank":
         get_data = get_litbank_data
+    elif args.dataset == "research":
+        get_data = get_research_data
     else:
         get_data = get_wiki_data
 
