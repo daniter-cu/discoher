@@ -1,5 +1,6 @@
 import argparse
 import glob
+import json
 import msgpack
 import numpy as np
 import torch
@@ -70,7 +71,8 @@ def get_books_data(path):
     for book in data:
         lines = " ".join([l.strip() for l in book])
         all_data.append(lines)
-    return all_data[1:]
+    for d in all_data[1:]:
+        yield d
 
 def get_litbank_data(path):
     litbank_file = glob.glob(path + "*")
@@ -94,14 +96,15 @@ def get_litbank_data(path):
             if section:
                 book.append(section)
         data.append(book)
-    
+
     all_data = []
     for book in data:
         new_book = [" ".join(sec) for sec in book if len(sec) > 50]
         all_data.append(new_book)
-        
+
     all_data = [sec for book in all_data for sec in book]
-    return all_data
+    for d in all_data:
+        yield d
 
 def get_research_data(path):
     filenames = glob.glob(path+"/*.json")
@@ -114,10 +117,11 @@ def get_research_data(path):
                 if "Introduction" == ent['title']:
                     intro.append((ent['startOffset'], ent['sentence']))
             intro = sorted(intro)
-            intro = [b for a,b in intro]
+            intro = [b for a, b in intro]
             intro = " ".join(intro)
             all_intros.append(intro)
-    return all_intros
+    for d in all_intros:
+        yield d
 
 def  main(args):
     # TODO: check uninitialized weights
