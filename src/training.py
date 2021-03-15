@@ -56,6 +56,8 @@ parser.add_argument('--dry-run', action='store_true',
                     help='verify the code and the model')
 parser.add_argument('--save_ins_acc', type=str, default="../results/xu_ins_acc_iter.pkl",
                     help='path to save intermediate accuracies')
+parser.add_argument('--eval_xu', action='store_true',
+                    help='Do Xu et al sentence insertion evaluation.')
 
 DATANAME_WILDCARD = "*.pkl"
 
@@ -427,4 +429,10 @@ class ModelRunner():
 if __name__ == "__main__":
     print("args:", sys.argv)
     runner = ModelRunner(sys.argv[1:])
+
+    if runner.args.eval_xu:
+        ds = data.InsertionDataset(glob.glob("../data/xu/*.pkl"), 128, torch.device("gpu"))
+        dl = DataLoader(ds, batch_size=1, num_workers=0)
+        runner.evaluate_insertion(dl)
+
     runner.run()

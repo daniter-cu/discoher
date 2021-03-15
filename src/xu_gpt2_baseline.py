@@ -66,7 +66,7 @@ def main():
             all_acc.append(1 if loss > true_loss else 0)
         print("Currently at", np.mean(all_acc))
         with open(args.save_ins_acc, "wb") as f:
-                    pickle.dump(all_acc, f)
+            pickle.dump(all_acc, f)
     print(np.mean(all_acc))
 
 if __name__ == "__main__":
