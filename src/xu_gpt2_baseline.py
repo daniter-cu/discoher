@@ -1,6 +1,7 @@
 import argparse
 import csv
 import sys
+import pickle
 
 import numpy as np
 import torch
@@ -12,6 +13,8 @@ csv.field_size_limit(sys.maxsize)
 parser = argparse.ArgumentParser(description='Baseline eval for xu insertion.')
 parser.add_argument('--data_path', type=str, default='../../cross_domain_coherence/data/parsed_wsj/test_perm.tsv',
                     help='Name of save file')
+parser.add_argument('--save_ins_acc', type=str, default="../results/xu_ins_acc_gpt.pkl",
+                    help='path to save intermediate accuracies')
 args = parser.parse_args()
 
 def get_paragraphs():
@@ -39,7 +42,7 @@ def main():
 
     all_acc = []
     for para in tqdm(paragraphs):
-        indexed_tokens = tokenizer.encode(" ".join(para), return_tensors="pt",truncation=True, max_length=512)
+        indexed_tokens = tokenizer.encode(" ".join(para), return_tensors="pt", truncation=True, max_length=512)
         indexed_tokens = indexed_tokens[:, :512].to(device)
         with torch.no_grad():
             loss = model(indexed_tokens, labels=indexed_tokens, return_dict=True).loss
@@ -62,6 +65,8 @@ def main():
         for loss in false_losses:
             all_acc.append(1 if loss > true_loss else 0)
         print("Currently at", np.mean(all_acc))
+        with open(args.save_ins_acc, "wb") as f:
+                    pickle.dump(all_acc, f)
     print(np.mean(all_acc))
 
 if __name__ == "__main__":

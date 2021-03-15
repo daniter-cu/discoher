@@ -11,6 +11,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 import data
 import model
+import pickle
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM/GRU/Transformer Language Model')
 parser.add_argument('--train_data', type=str, default='../data/train/',
@@ -53,6 +54,8 @@ parser.add_argument('--nhead', type=int, default=2,
                     help='the number of heads in the encoder/decoder of the transformer model')
 parser.add_argument('--dry-run', action='store_true',
                     help='verify the code and the model')
+parser.add_argument('--save_ins_acc', type=str, default="../results/xu_ins_acc_iter.pkl",
+                    help='path to save intermediate accuracies')
 
 DATANAME_WILDCARD = "*.pkl"
 
@@ -285,6 +288,9 @@ class ModelRunner():
                     all_false_losses.append(loss)
                 for loss in all_false_losses:
                     all_acc.append(1 if loss > true_loss else 0)
+                print("Currently at", np.mean(all_acc))
+                with open(self.args.save_ins_acc, "wb") as f:
+                    pickle.dump(all_acc, f)
         return np.mean(all_acc)
 
     def train(self, epoch, max_batches=float('inf')):
