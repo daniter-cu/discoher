@@ -272,22 +272,22 @@ class ModelRunner():
                     for j in range(len(batch)):
                         if i == j:
                             continue
-                    inputs, targets = self.get_insertion_batch(batch, i, j)
-                    inputs = inputs.to(self.device)
-                    targets = targets.to(self.device)
-                    total = targets.shape[0]
-                    output = self.model(inputs)
-                    logits = torch.matmul(output.reshape(-1, 768), targets.reshape(-1, 768).t())
-                    logits = self.mask_logits(logits, total)
-                    labels = torch.zeros(total, dtype=torch.long)
-                    labels = labels.to(self.device)
+                        inputs, targets = self.get_insertion_batch(batch, i, j)
+                        inputs = inputs.to(self.device)
+                        targets = targets.to(self.device)
+                        total = targets.shape[0]
+                        output = self.model(inputs)
+                        logits = torch.matmul(output.reshape(-1, 768), targets.reshape(-1, 768).t())
+                        logits = self.mask_logits(logits, total)
+                        labels = torch.zeros(total, dtype=torch.long)
+                        labels = labels.to(self.device)
 
-                    # Downsample logits for more reasonable window
-                    all_options = self.create_contrastive_samples(total)
-                    # downsample logits
-                    logits = torch.gather(logits, 1, all_options)
-                    loss = self.criterion(logits, labels).item()
-                    all_false_losses.append(loss)
+                        # Downsample logits for more reasonable window
+                        all_options = self.create_contrastive_samples(total)
+                        # downsample logits
+                        logits = torch.gather(logits, 1, all_options)
+                        loss = self.criterion(logits, labels).item()
+                        all_false_losses.append(loss)
                 for loss in all_false_losses:
                     all_acc.append(1 if loss > true_loss else 0)
                 print("Currently at", np.mean(all_acc))
@@ -432,7 +432,7 @@ if __name__ == "__main__":
 
     if runner.args.eval_xu:
         print("Running Xu sentence Insertion Eval")
-        ds = data.InsertionDataset(glob.glob("../data/xu/*.pkl"), 128, torch.device("gpu"))
+        ds = data.InsertionDataset(glob.glob("../data/xu/*.pkl"), 128, runner.device)
         dl = DataLoader(ds, batch_size=1, num_workers=0)
         runner.evaluate_insertion(dl)
         exit()
