@@ -431,8 +431,10 @@ if __name__ == "__main__":
     runner = ModelRunner(sys.argv[1:])
 
     if runner.args.eval_xu:
+        print("Running Xu sentence Insertion Eval")
         ds = data.InsertionDataset(glob.glob("../data/xu/*.pkl"), 128, torch.device("gpu"))
         dl = DataLoader(ds, batch_size=1, num_workers=0)
         runner.evaluate_insertion(dl)
+        exit()
 
     runner.run()
