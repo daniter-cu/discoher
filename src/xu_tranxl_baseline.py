@@ -13,6 +13,8 @@ csv.field_size_limit(sys.maxsize)
 parser = argparse.ArgumentParser(description='Baseline eval for xu insertion.')
 parser.add_argument('--data_path', type=str, default='../../cross_domain_coherence/data/parsed_wsj/test_perm.tsv',
                     help='Name of save file')
+parser.add_argument('--save_ins_acc', type=str, default="../results/xu_ins_acc_transxl.pkl",
+                    help='path to save intermediate accuracies')
 args = parser.parse_args()
 
 def get_paragraphs():
@@ -43,7 +45,7 @@ def main():
     for para in tqdm(paragraphs):
         print(len(all_acc))
         indexed_tokens = tokenizer.encode(" ".join(para), return_tensors="pt")
-        indexed_tokens = indexed_tokens[:, :512].to(device)
+        indexed_tokens = indexed_tokens.to(device)
         with torch.no_grad():
             loss = model(indexed_tokens, labels=indexed_tokens, return_dict=True).losses
         true_loss = torch.mean(loss).cpu().numpy()
@@ -58,12 +60,14 @@ def main():
                 after_sents = other_sents[j:]
                 new_order = before_sents + [moved_sent] + after_sents
                 indexed_tokens = tokenizer.encode(" ".join(new_order), return_tensors="pt")
-                indexed_tokens = indexed_tokens[:, :512].to(device)
+                indexed_tokens = indexed_tokens.to(device)
                 with torch.no_grad():
                     loss = model(indexed_tokens, labels=indexed_tokens, return_dict=True).losses
                 false_losses.append(torch.mean(loss).cpu().numpy())
         for loss in false_losses:
             all_acc.append(1 if loss > true_loss else 0)
+        with open(args.save_ins_acc, "wb") as f:
+            pickle.dump(all_acc, f)
         print("Currently at", np.mean(all_acc))
         sys.stdout.flush()
     print(np.mean(all_acc))
